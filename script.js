@@ -1,53 +1,85 @@
-let req = new XMLHttpRequest();
-let educationURL =
-  "https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/for_user_education.json";
-let countryURL =
-  "https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/counties.json";
+let countyURL = 'https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/counties.json'
+let educationURL = 'https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/for_user_education.json'
 
-let height = 600;
-let width = 960;
+let countyData
+let educationData
 
-const getEducationData = async (countryData) => {
-  await fetch(educationURL)
-    .then((response) => response.json())
-    .then((result) => {
-      createSVG(result, countryData);
-    });
-};
+let canvas = d3.select('#canvas')
+let tooltip = d3.select('#tooltip')
 
-const colors = [
-  " rgb(229, 245, 224)",
-  "rgb(199, 233, 192)",
-  "rgb(161, 217 , 155)",
-  " rgb(116, 196, 118)",
-  "rgb(65, 171, 93)",
-  "rgb(35, 139 , 69)",
-  "rgb(0, 109 , 44)",
-];
+let drawMap = () => {
+    canvas.selectAll('path')
+            .data(countyData)
+            .enter()
+            .append('path')
+            .attr('d', d3.geoPath())
+            .attr('class', 'county')
+            .attr('fill', (countyDataItem) => {
+                let id = countyDataItem['id']
+                let county = educationData.find((item) => {
+                    return item['fips'] === id
+                })
+                let percentage = county['bachelorsOrHigher']
+                if(percentage <= 15){
+                    return 'pink'
+                }else if(percentage <= 30){
+                    return 'hotpink'
+                }else if(percentage <= 45){
+                    return 'red'
+                }else{
+                    return 'darkred'
+                }
+            })
+            .attr('data-fips', (countyDataItem) => {
+                return countyDataItem['id']
+            })
+            .attr('data-education', (countyDataItem) => {
+                let id = countyDataItem['id']
+                let county = educationData.find((item) => {
+                    return item['fips'] === id
+                })
+                let percentage = county['bachelorsOrHigher']
+                return percentage
+            })
+            .on('mouseover', (countyDataItem)=> {
+                tooltip.transition()
+                    .style('visibility', 'visible')
 
-const createSVG = (educationData, countryData) => {
-  let svg = d3
-    .select("body")
-    .append("svg")
-    .attr("height", height)
-    .attr("width", width);
-  let colorsG = svg
-    .append("g")
-    .attr("transform", `translate( ${height - 100} , 0)`);
-  let colorsR = colorsG
-    .selectAll("rect")
-    .data(colors)
-    .enter()
-    .append("rect")
-    .attr("height", 8)
-    .attr("width", 33)
-    .attr("x", (d, i) => i * 33)
-    .style("fill", (d) => d);
-};
+                let id = countyDataItem['id']
+                let county = educationData.find((item) => {
+                    return item['fips'] === id
+                })
 
-req.open("GET", countryURL, true);
-req.onload = () => {
-  let countryData = JSON.parse(req.responseText);
-  getEducationData(countryData);
-};
-req.send();
+                tooltip.text(county['fips'] + ' - ' + county['area_name'] + ', ' + 
+                    county['state'] + ' : ' + county['bachelorsOrHigher'] + '%')
+
+                tooltip.attr('data-education', county['bachelorsOrHigher'] )
+            })
+            .on('mouseout', (countyDataItem) => {
+                tooltip.transition()
+                    .style('visibility', 'hidden')
+            })
+}
+
+d3.json(countyURL).then(
+    (data, error) => {
+        if(error){
+            console.log(log)
+        }else{
+            countyData = topojson.feature(data, data.objects.counties).features
+            console.log(countyData)
+
+            d3.json(educationURL).then(
+                (data, error) => {
+                    if(error){
+                        console.log(error)
+                    }else{
+                        educationData = data
+                        console.log(educationData)
+                        drawMap()
+                    }
+                }
+            )
+        }
+    }
+)
